@@ -26,7 +26,7 @@ public:
 void
 TMutex::Lock()
 {
-  // TODO
+   // TODO
 }
 
 void
@@ -69,12 +69,14 @@ public:
    }
 
    bool stopped;
-   queue<string> mybitcoins;
+   unique_ptr<queue<string> > mybitcoins;
    TMutex mutex;
 
 private:
    Wallet() :
-      stopped(false) { }
+      stopped(false) {
+      mybitcoins.reset(new queue<string>());
+   }
 };
 
 // Родительский класс для поточных процедур.
@@ -125,19 +127,21 @@ private:
 
 void Producer::Run()
 {
-   string hash("012345678abcdef");
+   string hash("0123456");
    Wallet& wallet = Wallet::Instance();
 
    {
-      TMutexLocker lock(Wallet::Instance().mutex);
-      wallet.mybitcoins.push(hash);
+      TMutexLocker lock(wallet.mutex);
+      wallet.mybitcoins->push(hash);
    }
 
    ++generated;
    while (next_permutation(hash.begin(), hash.end())) {
       ++generated;
-      TMutexLocker lock();
-      wallet.mybitcoins.push(hash);
+      {
+         TMutexLocker lock(wallet.mutex);
+         wallet.mybitcoins->push(hash);
+      }
    }
    wallet.stopped = true;
 }
@@ -162,16 +166,16 @@ void Consumer::Run()
 {
    Wallet& wallet = Wallet::Instance();
 
-   while (!wallet.stopped || !wallet.mybitcoins.empty()) {
-      if (wallet.mybitcoins.empty()) {
+   while (!wallet.stopped || !wallet.mybitcoins->empty()) {
+      if (wallet.mybitcoins->empty()) {
          continue;
       }
       
-      cout << "Buy cool stuff using bitcoin " << wallet.mybitcoins.front() << endl;
       {
          TMutexLocker lock(wallet.mutex);
-         if (!wallet.mybitcoins.empty()) {
-            wallet.mybitcoins.pop();
+         if (!wallet.mybitcoins->empty()) {
+            cout << "Buy cool stuff using bitcoin " << wallet.mybitcoins->front() << endl;
+            wallet.mybitcoins->pop();
          }
       }
       ++consumed;
@@ -193,18 +197,20 @@ int main(int argc, char* argv[])
 
    unsigned long input_val = strtoul(argv[1], NULL, 10);
    if (input_val < 1 || input_val > 10) {
-      usage(argv[0], "producers number is out of range 0-10");
+      usage(argv[0], "producers number is out of range [1-10]");
       return 1;
    }
    int producers = input_val;
 
    input_val = strtoul(argv[2], NULL, 10);
    if (input_val < 1 || input_val > 10) {
-      usage(argv[0], "consumers number is out of range 0-10");
+      usage(argv[0], "consumers number is out of range [1-10]");
       return 1;
    }
    int consumers = input_val;
 
+   Wallet& wallet = Wallet::Instance(); // init
+   
    vector<TWorker*> workers;
    while (producers || consumers) {
       if (producers) {
