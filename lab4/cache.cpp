@@ -10,8 +10,7 @@ int sum_array_3d(int *a)
   for (i = 0; i < N; i++) 
     for (j = 0; j < N; j++) 
       for (k = 0; k < N; k++) 
-        sum += a[k + i*N*N + j*N];
-//        sum += a[i][j][k];
+        sum += a[k*N*N + j*N + i];
   return sum; 
 } 
 
@@ -20,7 +19,7 @@ int main() {
   int *a = (int*)malloc(sizeof(int) * N * N * N);
 
   double start = omp_get_wtime();
-  for (int i=0; i<1000; ++i) {
+  for (int i=0; i<3000; ++i) {
     sum_array_3d(a);
   }
 
